@@ -86,7 +86,7 @@ export default function UserDashboard() {
                 <AvatarFallback className="bg-blue-500 text-white">{getUserInitials()}</AvatarFallback>
               </Avatar>
               <span className="text-sm font-medium">{getDisplayName()}</span>
-              <Button variant="outline" size="sm" onClick={() => signOut()}>
+              <Button variant="outline" size="sm" onClick={signOut}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
               </Button>
