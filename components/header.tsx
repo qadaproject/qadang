@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
-import { ChevronDown, Globe, User } from "lucide-react"
+import { ChevronDown, Globe, User, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -116,7 +116,12 @@ export function Header() {
                   <DropdownMenuItem asChild>
                     <Link href="/bookings">My Bookings</Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => signOut()}>Sign out</DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Button variant="outline" size="sm" onClick={() => signOut()}>
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </Button>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
