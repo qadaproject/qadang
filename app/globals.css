@@ -69,13 +69,22 @@
 
 .search-input {
   border-radius: 0.25rem;
-  border: 2px solid #e5e7eb;
+  border: 2px solid #facc15;
   transition: all 0.2s;
 }
 
 .search-input:focus {
-  border-color: #0052d4;
-  box-shadow: 0 0 0 2px rgba(0, 82, 212, 0.2);
+  border-color: #eab308;
+  box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.2);
+}
+
+.yellow-border {
+  border: 2px solid #facc15;
+}
+
+.yellow-border:focus {
+  border-color: #eab308;
+  box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.2);
 }
 
 .vendor-logo {

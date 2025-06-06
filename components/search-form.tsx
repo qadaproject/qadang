@@ -97,15 +97,15 @@ export function SearchForm() {
   }
 
   return (
-    <form onSubmit={handleSearch} className="search-form bg-white p-4">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+    <form onSubmit={handleSearch} className="bg-white p-4 rounded-md shadow-md">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Pickup Location */}
         <div className="md:col-span-2">
           <div className="relative">
             <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <Input
               placeholder="Pick-up location"
-              className="pl-10 h-12 search-input"
+              className="pl-10 h-12 border-2 border-yellow-400 focus:border-yellow-500 focus:ring-yellow-500"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               required
@@ -115,162 +115,166 @@ export function SearchForm() {
 
         {/* Pickup Date */}
         <div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-full justify-start text-left font-normal h-12 search-input",
-                  !pickupDate && "text-muted-foreground",
-                )}
-              >
-                <Calendar className="mr-2 h-4 w-4" />
-                {pickupDate ? (
-                  <div className="flex flex-col items-start">
-                    <span className="text-xs text-gray-500">Pick-up date</span>
-                    <span>{format(pickupDate, "E, MMM d")}</span>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal h-12 border-2 border-yellow-400 hover:border-yellow-500",
+                      !pickupDate && "text-muted-foreground",
+                    )}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {pickupDate ? (
+                      <div className="flex flex-col items-start">
+                        <span className="text-xs text-gray-500">Pick-up date</span>
+                        <span>{format(pickupDate, "E, d MMM")}</span>
+                      </div>
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={pickupDate}
+                    onSelect={(date) => date && setPickupDate(date)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div>
+              <Select value={pickupTime} onValueChange={setPickupTime}>
+                <SelectTrigger className="h-12 border-2 border-yellow-400 hover:border-yellow-500">
+                  <div className="flex items-center">
+                    <Clock className="mr-2 h-4 w-4 text-gray-400" />
+                    <div className="flex flex-col items-start">
+                      <span className="text-xs text-gray-500">Time</span>
+                      <SelectValue placeholder="Select time" />
+                    </div>
                   </div>
-                ) : (
-                  <span>Pick a date</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <CalendarComponent
-                mode="single"
-                selected={pickupDate}
-                onSelect={(date) => date && setPickupDate(date)}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        {/* Pickup Time */}
-        <div>
-          <Select value={pickupTime} onValueChange={setPickupTime}>
-            <SelectTrigger className="h-12 search-input">
-              <div className="flex items-center">
-                <Clock className="mr-2 h-4 w-4 text-gray-400" />
-                <div className="flex flex-col items-start">
-                  <span className="text-xs text-gray-500">Time</span>
-                  <SelectValue placeholder="Select time" />
-                </div>
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              {timeOptions.map((time) => (
-                <SelectItem key={time} value={time}>
-                  {time}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                </SelectTrigger>
+                <SelectContent>
+                  {timeOptions.map((time) => (
+                    <SelectItem key={time} value={time}>
+                      {time}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
 
         {/* Return Date */}
         <div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-full justify-start text-left font-normal h-12 search-input",
-                  !returnDate && "text-muted-foreground",
-                )}
-              >
-                <Calendar className="mr-2 h-4 w-4" />
-                {returnDate ? (
-                  <div className="flex flex-col items-start">
-                    <span className="text-xs text-gray-500">Drop-off date</span>
-                    <span>{format(returnDate, "E, MMM d")}</span>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal h-12 border-2 border-yellow-400 hover:border-yellow-500",
+                      !returnDate && "text-muted-foreground",
+                    )}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {returnDate ? (
+                      <div className="flex flex-col items-start">
+                        <span className="text-xs text-gray-500">Drop-off date</span>
+                        <span>{format(returnDate, "E, d MMM")}</span>
+                      </div>
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={returnDate}
+                    onSelect={(date) => date && setReturnDate(date)}
+                    initialFocus
+                    disabled={(date) => date < pickupDate}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div>
+              <Select value={returnTime} onValueChange={setReturnTime}>
+                <SelectTrigger className="h-12 border-2 border-yellow-400 hover:border-yellow-500">
+                  <div className="flex items-center">
+                    <Clock className="mr-2 h-4 w-4 text-gray-400" />
+                    <div className="flex flex-col items-start">
+                      <span className="text-xs text-gray-500">Time</span>
+                      <SelectValue placeholder="Select time" />
+                    </div>
                   </div>
-                ) : (
-                  <span>Pick a date</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <CalendarComponent
-                mode="single"
-                selected={returnDate}
-                onSelect={(date) => date && setReturnDate(date)}
-                initialFocus
-                disabled={(date) => date < pickupDate}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        {/* Return Time */}
-        <div className="md:hidden">
-          <Select value={returnTime} onValueChange={setReturnTime}>
-            <SelectTrigger className="h-12 search-input">
-              <div className="flex items-center">
-                <Clock className="mr-2 h-4 w-4 text-gray-400" />
-                <div className="flex flex-col items-start">
-                  <span className="text-xs text-gray-500">Time</span>
-                  <SelectValue placeholder="Select time" />
-                </div>
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              {timeOptions.map((time) => (
-                <SelectItem key={time} value={time}>
-                  {time}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                </SelectTrigger>
+                <SelectContent>
+                  {timeOptions.map((time) => (
+                    <SelectItem key={time} value={time}>
+                      {time}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
 
         {/* Search Button */}
-        <div className="md:col-span-5">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col space-y-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="different-location"
-                  checked={differentDropoff}
-                  onCheckedChange={(checked) => setDifferentDropoff(checked as boolean)}
-                />
-                <Label htmlFor="different-location" className="text-sm">
-                  Drop car off at different location
-                </Label>
-              </div>
+        <div className="md:col-span-2">
+          <Button type="submit" className="w-full bg-[#0071c2] hover:bg-[#005999] text-white h-12">
+            Search
+          </Button>
+        </div>
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="driver-age"
-                  checked={driverAge}
-                  onCheckedChange={(checked) => setDriverAge(checked as boolean)}
-                />
-                <Label htmlFor="driver-age" className="text-sm">
-                  Driver aged 30 – 65?
-                </Label>
-              </div>
-            </div>
-
-            <Button type="submit" className="bg-[#0071c2] hover:bg-[#005999] text-white px-8">
-              Search
-            </Button>
+        {/* Checkboxes */}
+        <div className="md:col-span-2 space-y-2">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="different-location"
+              checked={differentDropoff}
+              onCheckedChange={(checked) => setDifferentDropoff(checked as boolean)}
+            />
+            <Label htmlFor="different-location" className="text-sm">
+              Drop car off at different location
+            </Label>
           </div>
 
-          {differentDropoff && (
-            <div className="mt-4">
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <Input
-                  placeholder="Drop-off location"
-                  className="pl-10 h-12 search-input"
-                  value={dropoffLocation}
-                  onChange={(e) => setDropoffLocation(e.target.value)}
-                  required={differentDropoff}
-                />
-              </div>
-            </div>
-          )}
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="driver-age"
+              checked={driverAge}
+              onCheckedChange={(checked) => setDriverAge(checked as boolean)}
+            />
+            <Label htmlFor="driver-age" className="text-sm">
+              Driver aged 30 – 65?
+            </Label>
+          </div>
         </div>
+
+        {/* Different Dropoff Location */}
+        {differentDropoff && (
+          <div className="md:col-span-2 mt-2">
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <Input
+                placeholder="Drop-off location"
+                className="pl-10 h-12 border-2 border-yellow-400 focus:border-yellow-500 focus:ring-yellow-500"
+                value={dropoffLocation}
+                onChange={(e) => setDropoffLocation(e.target.value)}
+                required={differentDropoff}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </form>
   )
