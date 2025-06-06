@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Eye, EyeOff, Car } from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -25,10 +25,23 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("customer")
 
-  const { signIn } = useAuth()
+  const { signIn, user, profile } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get("redirect") || "/"
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && profile) {
+      if (profile.role === "vendor") {
+        router.push("/vendor-dashboard")
+      } else if (profile.role === "admin") {
+        router.push("/admin")
+      } else {
+        router.push("/dashboard")
+      }
+    }
+  }, [user, profile, router])
 
   const handleLogin = async (e: React.FormEvent, userType: string) => {
     e.preventDefault()
@@ -39,14 +52,17 @@ export default function LoginPage() {
       const { success, error } = await signIn(email, password)
 
       if (success) {
-        // Redirect based on user type
-        if (userType === "vendor") {
-          router.push("/vendor-dashboard")
-        } else if (userType === "admin") {
-          router.push("/admin")
-        } else {
-          router.push(redirect)
-        }
+        // Force a small delay to ensure auth state is updated
+        setTimeout(() => {
+          // Redirect based on user type
+          if (userType === "vendor") {
+            router.push("/vendor-dashboard")
+          } else if (userType === "admin") {
+            router.push("/admin")
+          } else {
+            router.push("/dashboard")
+          }
+        }, 100)
       } else {
         setError(error || "Login failed. Please check your credentials.")
       }
@@ -56,6 +72,18 @@ export default function LoginPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Show loading if already authenticated
+  if (user && profile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-800 flex items-center justify-center">
+        <div className="text-white text-center">
+          <Car className="h-12 w-12 mx-auto mb-4 animate-spin" />
+          <p>Redirecting to your dashboard...</p>
+        </div>
+      </div>
+    )
   }
 
   return (

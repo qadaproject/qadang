@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
@@ -47,7 +46,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
-  const router = useRouter()
 
   // Initialize auth state
   useEffect(() => {
@@ -75,6 +73,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth state changed:", event, session?.user?.email)
+
       if (session?.user) {
         setUser(session.user)
         await fetchUserProfile(session.user.id)
@@ -93,6 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fetch user profile from database
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log("Fetching profile for user:", userId)
+
       // First try to get customer profile
       const { data: customerData, error: customerError } = await supabase
         .from("users")
@@ -101,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single()
 
       if (customerData) {
+        console.log("Found customer profile:", customerData)
         setProfile({
           ...customerData,
           role: "customer",
@@ -116,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single()
 
       if (vendorData) {
+        console.log("Found vendor profile:", vendorData)
         setProfile({
           ...vendorData,
           role: "vendor",
@@ -127,6 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: adminData, error: adminError } = await supabase.from("admins").select("*").eq("id", userId).single()
 
       if (adminData) {
+        console.log("Found admin profile:", adminData)
         setProfile({
           ...adminData,
           role: "admin",
@@ -134,17 +139,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
+      console.log("No profile found, creating default")
       // If no profile found, create a basic one
-      if (!customerData && !vendorData && !adminData) {
-        const { data: userData } = await supabase.auth.getUser()
-        if (userData?.user) {
-          setProfile({
-            id: userData.user.id,
-            email: userData.user.email || "",
-            role: "customer", // Default role
-            email_verified: false,
-          })
-        }
+      const { data: userData } = await supabase.auth.getUser()
+      if (userData?.user) {
+        setProfile({
+          id: userData.user.id,
+          email: userData.user.email || "",
+          role: "customer", // Default role
+          email_verified: false,
+        })
       }
     } catch (error) {
       console.error("Error fetching user profile:", error)
@@ -154,22 +158,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Sign in function
   const signIn = async (email: string, password: string) => {
     try {
+      console.log("Attempting to sign in:", email)
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
+        console.error("Sign in error:", error)
         return { success: false, error: error.message }
       }
 
       if (data.user) {
+        console.log("Sign in successful:", data.user.email)
+        setUser(data.user)
         await fetchUserProfile(data.user.id)
         return { success: true }
       }
 
       return { success: false, error: "Unknown error occurred" }
     } catch (error: any) {
+      console.error("Sign in exception:", error)
       return { success: false, error: error.message }
     }
   }
@@ -245,10 +255,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Sign out function
   const signOut = async () => {
+    console.log("Signing out...")
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
-    router.push("/")
   }
 
   // Reset password function
