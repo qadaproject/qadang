@@ -6,6 +6,28 @@ const supabaseAnonKey =
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+// Helper function to handle Supabase errors
+export const handleSupabaseError = (error: any) => {
+  console.error("Supabase error:", error)
+  return {
+    success: false,
+    error: error.message || "An unexpected error occurred",
+  }
+}
+
+// Helper function for authenticated requests
+export const getAuthenticatedUser = async () => {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+  if (error) {
+    console.error("Auth error:", error)
+    return null
+  }
+  return user
+}
+
 // Database types
 export interface User {
   id: string

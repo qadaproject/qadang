@@ -1,122 +1,226 @@
 "use client"
 
-import { useState } from "react"
-import { Search, Filter, MapPin, Star, Users, Fuel, Settings, Grid, List } from "lucide-react"
-import Image from "next/image"
-import Link from "next/link"
-
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
+import { SearchForm } from "@/components/search-form"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
+import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Car, MapPin, Star, Users, Fuel, Settings, Filter, Grid, List } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
+import { supabase } from "@/lib/supabase"
+import { format, parseISO } from "date-fns"
+import { cn } from "@/lib/utils"
+
+interface CarResult {
+  id: string
+  name: string
+  brand: string
+  model: string
+  year: number
+  price_per_day: number
+  transmission: string
+  fuel_type: string
+  seats: number
+  features: string[]
+  images: string[]
+  location: string
+  address: string
+  rating: number
+  total_bookings: number
+  vendor_id: string
+  vendors: {
+    business_name: string
+    rating: number
+  }
+}
 
 export default function SearchPage() {
+  const searchParams = useSearchParams()
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [priceRange, setPriceRange] = useState([10000, 50000])
+  const [priceRange, setPriceRange] = useState([5000, 50000])
+  const [sortBy, setSortBy] = useState("recommended")
+  const [cars, setCars] = useState<CarResult[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filters, setFilters] = useState({
+    carTypes: [] as string[],
+    transmission: [] as string[],
+    features: [] as string[],
+    rating: null as number | null,
+  })
 
-  const searchResults = [
-    {
-      id: 1,
-      name: "Toyota Corolla 2022",
-      vendor: "Lagos Car Rentals",
-      price: 15000,
-      originalPrice: 18000,
-      rating: 4.8,
-      reviews: 124,
-      image: "/placeholder.svg?height=200&width=300",
-      features: ["Automatic", "AC", "4 Seats", "Bluetooth"],
-      location: "Lagos Island",
-      distance: "2.5 km from center",
-      fuelType: "Petrol",
-      transmission: "Automatic",
-      verified: true,
-      instantBook: true,
-    },
-    {
-      id: 2,
-      name: "Honda Accord 2023",
-      vendor: "Abuja Premium Cars",
-      price: 25000,
-      rating: 4.9,
-      reviews: 89,
-      image: "/placeholder.svg?height=200&width=300",
-      features: ["Automatic", "AC", "5 Seats", "GPS"],
-      location: "Wuse 2",
-      distance: "1.2 km from center",
-      fuelType: "Petrol",
-      transmission: "Automatic",
-      verified: true,
-      instantBook: false,
-    },
-    {
-      id: 3,
-      name: "Hyundai Elantra 2022",
-      vendor: "Port Harcourt Rentals",
-      price: 18000,
-      rating: 4.7,
-      reviews: 156,
-      image: "/placeholder.svg?height=200&width=300",
-      features: ["Manual", "AC", "5 Seats", "USB"],
-      location: "GRA Phase 1",
-      distance: "3.1 km from center",
-      fuelType: "Petrol",
-      transmission: "Manual",
-      verified: true,
-      instantBook: true,
-    },
-    {
-      id: 4,
-      name: "Kia Picanto 2021",
-      vendor: "Budget Cars Nigeria",
-      price: 12000,
-      rating: 4.5,
-      reviews: 203,
-      image: "/placeholder.svg?height=200&width=300",
-      features: ["Manual", "AC", "4 Seats"],
-      location: "Ikeja",
-      distance: "5.2 km from center",
-      fuelType: "Petrol",
-      transmission: "Manual",
-      verified: true,
-      instantBook: true,
-    },
-    {
-      id: 5,
-      name: "Mercedes C-Class 2023",
-      vendor: "Luxury Rides Lagos",
-      price: 45000,
-      rating: 4.9,
-      reviews: 67,
-      image: "/placeholder.svg?height=200&width=300",
-      features: ["Automatic", "AC", "5 Seats", "Leather", "GPS", "Bluetooth"],
-      location: "Victoria Island",
-      distance: "1.8 km from center",
-      fuelType: "Petrol",
-      transmission: "Automatic",
-      verified: true,
-      instantBook: false,
-    },
-    {
-      id: 6,
-      name: "Nissan Sentra 2022",
-      vendor: "Reliable Rentals",
-      price: 16000,
-      rating: 4.6,
-      reviews: 98,
-      image: "/placeholder.svg?height=200&width=300",
-      features: ["Automatic", "AC", "5 Seats", "Bluetooth"],
-      location: "Surulere",
-      distance: "4.3 km from center",
-      fuelType: "Petrol",
-      transmission: "Automatic",
-      verified: true,
-      instantBook: true,
-    },
-  ]
+  const pickupLocation = searchParams.get("pickup_location") || ""
+  const pickupDate = searchParams.get("pickup_date")
+    ? format(parseISO(searchParams.get("pickup_date")!), "MMM dd")
+    : format(new Date(), "MMM dd")
+  const returnDate = searchParams.get("return_date")
+    ? format(parseISO(searchParams.get("return_date")!), "MMM dd")
+    : format(new Date(), "MMM dd")
+
+  useEffect(() => {
+    fetchCars()
+  }, [searchParams, sortBy])
+
+  const fetchCars = async () => {
+    try {
+      setLoading(true)
+
+      let query = supabase
+        .from("cars")
+        .select(`
+          *,
+          vendors (
+            business_name,
+            rating
+          )
+        `)
+        .eq("status", "active")
+        .eq("is_available", true)
+
+      // Apply location filter if provided
+      if (pickupLocation) {
+        query = query.ilike("location", `%${pickupLocation}%`)
+      }
+
+      // Apply vendor filter if provided
+      const vendorId = searchParams.get("vendor")
+      if (vendorId) {
+        query = query.eq("vendor_id", vendorId)
+      }
+
+      // Apply sorting
+      switch (sortBy) {
+        case "price-low":
+          query = query.order("price_per_day", { ascending: true })
+          break
+        case "price-high":
+          query = query.order("price_per_day", { ascending: false })
+          break
+        case "rating":
+          query = query.order("rating", { ascending: false })
+          break
+        default:
+          query = query.order("rating", { ascending: false })
+      }
+
+      const { data, error } = await query
+
+      if (error) throw error
+
+      setCars(data || [])
+    } catch (error) {
+      console.error("Error fetching cars:", error)
+      // Fallback data
+      setCars([
+        {
+          id: "1",
+          name: "Toyota Corolla 2022",
+          brand: "Toyota",
+          model: "Corolla",
+          year: 2022,
+          price_per_day: 15000,
+          transmission: "Automatic",
+          fuel_type: "Petrol",
+          seats: 5,
+          features: ["Automatic", "AC", "Bluetooth", "USB Port"],
+          images: ["/placeholder.svg?height=200&width=300"],
+          location: "Lagos Island",
+          address: "123 Marina Street, Lagos Island",
+          rating: 4.8,
+          total_bookings: 124,
+          vendor_id: "1",
+          vendors: {
+            business_name: "Lagos Car Rentals",
+            rating: 4.8,
+          },
+        },
+        {
+          id: "2",
+          name: "Honda Accord 2023",
+          brand: "Honda",
+          model: "Accord",
+          year: 2023,
+          price_per_day: 25000,
+          transmission: "Automatic",
+          fuel_type: "Petrol",
+          seats: 5,
+          features: ["Automatic", "AC", "GPS", "Leather Seats"],
+          images: ["/placeholder.svg?height=200&width=300"],
+          location: "Wuse 2, Abuja",
+          address: "45 Ademola Adetokunbo Crescent, Wuse 2",
+          rating: 4.9,
+          total_bookings: 89,
+          vendor_id: "2",
+          vendors: {
+            business_name: "Abuja Premium Cars",
+            rating: 4.9,
+          },
+        },
+      ])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const applyFilters = (car: CarResult) => {
+    // Price filter
+    if (car.price_per_day < priceRange[0] || car.price_per_day > priceRange[1]) {
+      return false
+    }
+
+    // Car type filter
+    if (filters.carTypes.length > 0) {
+      const carType = getCarType(car)
+      if (!filters.carTypes.includes(carType)) {
+        return false
+      }
+    }
+
+    // Transmission filter
+    if (filters.transmission.length > 0 && !filters.transmission.includes(car.transmission.toLowerCase())) {
+      return false
+    }
+
+    // Features filter
+    if (filters.features.length > 0) {
+      const hasAllFeatures = filters.features.every((feature) =>
+        car.features.some((carFeature) => carFeature.toLowerCase().includes(feature.toLowerCase())),
+      )
+      if (!hasAllFeatures) {
+        return false
+      }
+    }
+
+    // Rating filter
+    if (filters.rating && car.rating < filters.rating) {
+      return false
+    }
+
+    return true
+  }
+
+  const getCarType = (car: CarResult) => {
+    const model = car.model.toLowerCase()
+    if (model.includes("suv") || model.includes("crossover")) return "suv"
+    if (model.includes("sedan")) return "sedan"
+    if (model.includes("hatchback")) return "hatchback"
+    if (model.includes("pickup") || model.includes("truck")) return "pickup"
+    if (model.includes("van") || model.includes("minivan")) return "van"
+    if (model.includes("luxury") || car.price_per_day > 40000) return "luxury"
+    if (car.price_per_day < 15000) return "economy"
+    return "mid-size"
+  }
+
+  const filteredCars = cars.filter(applyFilters)
 
   const FilterSidebar = () => (
     <div className="space-y-6">
@@ -138,57 +242,129 @@ export default function SearchPage() {
         </div>
       </div>
 
+      <Separator />
+
       <div>
         <h3 className="font-semibold mb-3">Car Type</h3>
         <div className="space-y-2">
-          {["Economy", "Compact", "Mid-size", "Full-size", "Luxury", "SUV"].map((type) => (
+          {["Economy", "Mid-size", "Full-size", "SUV", "Luxury", "Van"].map((type) => (
             <div key={type} className="flex items-center space-x-2">
-              <Checkbox id={type} />
-              <label htmlFor={type} className="text-sm">
+              <Checkbox
+                id={`type-${type}`}
+                checked={filters.carTypes.includes(type.toLowerCase())}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setFilters({
+                      ...filters,
+                      carTypes: [...filters.carTypes, type.toLowerCase()],
+                    })
+                  } else {
+                    setFilters({
+                      ...filters,
+                      carTypes: filters.carTypes.filter((t) => t !== type.toLowerCase()),
+                    })
+                  }
+                }}
+              />
+              <Label htmlFor={`type-${type}`} className="text-sm">
                 {type}
-              </label>
+              </Label>
             </div>
           ))}
         </div>
       </div>
+
+      <Separator />
 
       <div>
         <h3 className="font-semibold mb-3">Transmission</h3>
         <div className="space-y-2">
           {["Automatic", "Manual"].map((trans) => (
             <div key={trans} className="flex items-center space-x-2">
-              <Checkbox id={trans} />
-              <label htmlFor={trans} className="text-sm">
+              <Checkbox
+                id={`trans-${trans}`}
+                checked={filters.transmission.includes(trans.toLowerCase())}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setFilters({
+                      ...filters,
+                      transmission: [...filters.transmission, trans.toLowerCase()],
+                    })
+                  } else {
+                    setFilters({
+                      ...filters,
+                      transmission: filters.transmission.filter((t) => t !== trans.toLowerCase()),
+                    })
+                  }
+                }}
+              />
+              <Label htmlFor={`trans-${trans}`} className="text-sm">
                 {trans}
-              </label>
+              </Label>
             </div>
           ))}
         </div>
       </div>
+
+      <Separator />
 
       <div>
         <h3 className="font-semibold mb-3">Features</h3>
         <div className="space-y-2">
           {["Air Conditioning", "GPS Navigation", "Bluetooth", "USB Port", "Leather Seats"].map((feature) => (
             <div key={feature} className="flex items-center space-x-2">
-              <Checkbox id={feature} />
-              <label htmlFor={feature} className="text-sm">
+              <Checkbox
+                id={`feature-${feature}`}
+                checked={filters.features.includes(feature.toLowerCase())}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setFilters({
+                      ...filters,
+                      features: [...filters.features, feature.toLowerCase()],
+                    })
+                  } else {
+                    setFilters({
+                      ...filters,
+                      features: filters.features.filter((f) => f !== feature.toLowerCase()),
+                    })
+                  }
+                }}
+              />
+              <Label htmlFor={`feature-${feature}`} className="text-sm">
                 {feature}
-              </label>
+              </Label>
             </div>
           ))}
         </div>
       </div>
+
+      <Separator />
 
       <div>
         <h3 className="font-semibold mb-3">Vendor Rating</h3>
         <div className="space-y-2">
           {[5, 4, 3].map((rating) => (
             <div key={rating} className="flex items-center space-x-2">
-              <Checkbox id={`rating-${rating}`} />
-              <label htmlFor={`rating-${rating}`} className="text-sm flex items-center">
+              <Checkbox
+                id={`rating-${rating}`}
+                checked={filters.rating === rating}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setFilters({
+                      ...filters,
+                      rating,
+                    })
+                  } else {
+                    setFilters({
+                      ...filters,
+                      rating: null,
+                    })
+                  }
+                }}
+              />
+              <Label htmlFor={`rating-${rating}`} className="text-sm flex items-center">
                 {rating}+ <Star className="h-3 w-3 ml-1 fill-yellow-400 text-yellow-400" />
-              </label>
+              </Label>
             </div>
           ))}
         </div>
@@ -196,25 +372,20 @@ export default function SearchPage() {
     </div>
   )
 
-  const CarCard = ({ car, isListView = false }: { car: (typeof searchResults)[0]; isListView?: boolean }) => (
+  const CarCard = ({ car, isListView = false }: { car: CarResult; isListView?: boolean }) => (
     <Card className={`overflow-hidden hover:shadow-lg transition-shadow ${isListView ? "flex" : ""}`}>
       <div className={`relative ${isListView ? "w-64 flex-shrink-0" : ""}`}>
         <Image
-          src={car.image || "/placeholder.svg"}
+          src={car.images?.[0] || "/placeholder.svg?height=200&width=300"}
           alt={car.name}
           width={300}
           height={200}
           className={`object-cover ${isListView ? "w-full h-full" : "w-full h-48"}`}
         />
         <div className="absolute top-3 left-3 flex flex-col gap-1">
-          {car.verified && <Badge className="bg-green-600 text-xs">Verified</Badge>}
-          {car.instantBook && <Badge className="bg-blue-600 text-xs">Instant Book</Badge>}
+          <Badge className="bg-green-600 text-xs">Verified</Badge>
+          <Badge className="bg-blue-600 text-xs">Instant Book</Badge>
         </div>
-        {car.originalPrice && car.originalPrice > car.price && (
-          <Badge className="absolute top-3 right-3 bg-red-600 text-xs">
-            Save ₦{(car.originalPrice - car.price).toLocaleString()}
-          </Badge>
-        )}
       </div>
 
       <CardContent className={`p-4 ${isListView ? "flex-1" : ""}`}>
@@ -224,35 +395,32 @@ export default function SearchPage() {
               <h3 className="font-semibold text-lg">{car.name}</h3>
               {!isListView && (
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-blue-600">₦{car.price.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-[#0071c2]">₦{car.price_per_day.toLocaleString()}</div>
                   <div className="text-sm text-gray-500">per day</div>
-                  {car.originalPrice && (
-                    <div className="text-sm text-gray-400 line-through">₦{car.originalPrice.toLocaleString()}</div>
-                  )}
                 </div>
               )}
             </div>
 
-            <p className="text-gray-600 text-sm mb-2">{car.vendor}</p>
+            <p className="text-gray-600 text-sm mb-2">{car.vendors?.business_name}</p>
 
             <div className="flex items-center mb-3">
               <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
               <span className="ml-1 text-sm font-medium">{car.rating}</span>
-              <span className="ml-1 text-sm text-gray-500">({car.reviews} reviews)</span>
+              <span className="ml-1 text-sm text-gray-500">({car.total_bookings} bookings)</span>
             </div>
 
             <div className="flex items-center text-sm text-gray-500 mb-3">
               <MapPin className="h-4 w-4 mr-1" />
-              {car.location} • {car.distance}
+              {car.location}
             </div>
 
             <div className="flex flex-wrap gap-2 mb-4">
-              {car.features.slice(0, isListView ? 6 : 4).map((feature, index) => (
+              {car.features?.slice(0, isListView ? 6 : 4).map((feature, index) => (
                 <Badge key={index} variant="secondary" className="text-xs">
                   {feature}
                 </Badge>
               ))}
-              {car.features.length > (isListView ? 6 : 4) && (
+              {car.features && car.features.length > (isListView ? 6 : 4) && (
                 <Badge variant="secondary" className="text-xs">
                   +{car.features.length - (isListView ? 6 : 4)} more
                 </Badge>
@@ -262,7 +430,7 @@ export default function SearchPage() {
             <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
               <div className="flex items-center">
                 <Fuel className="h-4 w-4 mr-1" />
-                {car.fuelType}
+                {car.fuel_type}
               </div>
               <div className="flex items-center">
                 <Settings className="h-4 w-4 mr-1" />
@@ -270,31 +438,26 @@ export default function SearchPage() {
               </div>
               <div className="flex items-center">
                 <Users className="h-4 w-4 mr-1" />
-                {car.features.find((f) => f.includes("Seats"))?.replace(" Seats", "") || "5"} seats
+                {car.seats} seats
               </div>
             </div>
           </div>
 
           {isListView && (
             <div className="text-right ml-4">
-              <div className="text-2xl font-bold text-blue-600">₦{car.price.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-[#0071c2]">₦{car.price_per_day.toLocaleString()}</div>
               <div className="text-sm text-gray-500">per day</div>
-              {car.originalPrice && (
-                <div className="text-sm text-gray-400 line-through">₦{car.originalPrice.toLocaleString()}</div>
-              )}
             </div>
           )}
         </div>
 
         <div className="flex gap-2">
           <Link href={`/cars/${car.id}`} className="flex-1">
-            <Button className="w-full">View Details</Button>
+            <Button className="w-full bg-[#0071c2] hover:bg-[#005999]">View Details</Button>
           </Link>
-          {car.instantBook && (
-            <Button variant="outline" className="flex-1">
-              Book Now
-            </Button>
-          )}
+          <Button variant="outline" className="flex-1">
+            Book Now
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -302,40 +465,79 @@ export default function SearchPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-40">
+      <Header />
+
+      <div className="bg-[#003087] text-white py-6">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between py-4">
-            <Link href="/" className="text-2xl font-bold text-blue-600">
-              QADA.ng
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Link href="/auth/login">
-                <Button variant="ghost">Sign in</Button>
-              </Link>
-              <Link href="/auth/register">
-                <Button>Register</Button>
-              </Link>
+          <h1 className="text-2xl font-bold mb-4">Car rentals in {pickupLocation || "Nigeria"}</h1>
+          <SearchForm />
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-6">
+        {/* Results Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold">
+              {filteredCars.length} cars found {pickupLocation ? `in ${pickupLocation}` : ""}
+            </h2>
+            <p className="text-gray-600">
+              {pickupDate} - {returnDate}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Mobile Filter */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="lg:hidden">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filters
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-80">
+                <SheetHeader>
+                  <SheetTitle>Filters</SheetTitle>
+                  <SheetDescription>Refine your search results</SheetDescription>
+                </SheetHeader>
+                <div className="mt-6">
+                  <FilterSidebar />
+                </div>
+              </SheetContent>
+            </Sheet>
+
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recommended">Recommended</SelectItem>
+                <SelectItem value="price-low">Price: Low to High</SelectItem>
+                <SelectItem value="price-high">Price: High to Low</SelectItem>
+                <SelectItem value="rating">Highest Rated</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="flex border rounded-md">
+              <Button
+                variant={viewMode === "grid" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("grid")}
+                className={cn("rounded-r-none", viewMode === "grid" ? "bg-[#0071c2] hover:bg-[#005999]" : "")}
+              >
+                <Grid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("list")}
+                className={cn("rounded-l-none", viewMode === "list" ? "bg-[#0071c2] hover:bg-[#005999]" : "")}
+              >
+                <List className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-6">
-        {/* Search Bar */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex gap-4 items-center">
-              <div className="flex-1">
-                <Input placeholder="Search by location, car model, or vendor..." className="w-full" />
-              </div>
-              <Button>
-                <Search className="h-4 w-4 mr-2" />
-                Search
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         <div className="flex gap-6">
           {/* Desktop Filters */}
@@ -350,83 +552,65 @@ export default function SearchPage() {
 
           {/* Main Content */}
           <div className="flex-1">
-            {/* Results Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-2xl font-bold">Lagos: {searchResults.length} cars found</h1>
-                <p className="text-gray-600">Dec 15 - Dec 18 • 3 days</p>
+            {loading ? (
+              <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 gap-6" : "space-y-4"}>
+                {[...Array(6)].map((_, i) => (
+                  <Card key={i} className={`overflow-hidden animate-pulse ${viewMode === "list" ? "flex" : ""}`}>
+                    <div className={`${viewMode === "list" ? "w-64 h-auto" : "h-48"} bg-gray-200`} />
+                    <CardContent className="p-4">
+                      <div className="h-4 bg-gray-200 rounded mb-2 w-3/4" />
+                      <div className="h-3 bg-gray-200 rounded mb-3 w-1/2" />
+                      <div className="h-3 bg-gray-200 rounded mb-4 w-1/4" />
+                      <div className="flex gap-2 mb-4">
+                        {[...Array(3)].map((_, j) => (
+                          <div key={j} className="h-6 bg-gray-200 rounded w-16" />
+                        ))}
+                      </div>
+                      <div className="h-10 bg-gray-200 rounded" />
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-
-              <div className="flex items-center gap-4">
-                {/* Mobile Filter */}
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button variant="outline" className="lg:hidden">
-                      <Filter className="h-4 w-4 mr-2" />
-                      Filters
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left" className="w-80">
-                    <SheetHeader>
-                      <SheetTitle>Filters</SheetTitle>
-                      <SheetDescription>Refine your search results</SheetDescription>
-                    </SheetHeader>
-                    <div className="mt-6">
-                      <FilterSidebar />
-                    </div>
-                  </SheetContent>
-                </Sheet>
-
-                <Select defaultValue="recommended">
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="recommended">Recommended</SelectItem>
-                    <SelectItem value="price-low">Price: Low to High</SelectItem>
-                    <SelectItem value="price-high">Price: High to Low</SelectItem>
-                    <SelectItem value="rating">Highest Rated</SelectItem>
-                    <SelectItem value="distance">Distance</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <div className="flex border rounded-md">
-                  <Button
-                    variant={viewMode === "grid" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("grid")}
-                    className="rounded-r-none"
-                  >
-                    <Grid className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === "list" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("list")}
-                    className="rounded-l-none"
-                  >
-                    <List className="h-4 w-4" />
-                  </Button>
-                </div>
+            ) : filteredCars.length > 0 ? (
+              <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 gap-6" : "space-y-4"}>
+                {filteredCars.map((car) => (
+                  <CarCard key={car.id} car={car} isListView={viewMode === "list"} />
+                ))}
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-12">
+                <Car className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-xl font-semibold mb-2">No cars found</h3>
+                <p className="text-gray-600 mb-4">Try adjusting your filters or search criteria</p>
+                <Button
+                  onClick={() => {
+                    setPriceRange([5000, 50000])
+                    setFilters({
+                      carTypes: [],
+                      transmission: [],
+                      features: [],
+                      rating: null,
+                    })
+                  }}
+                  className="bg-[#0071c2] hover:bg-[#005999]"
+                >
+                  Reset Filters
+                </Button>
+              </div>
+            )}
 
-            {/* Results Grid/List */}
-            <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 gap-6" : "space-y-4"}>
-              {searchResults.map((car) => (
-                <CarCard key={car.id} car={car} isListView={viewMode === "list"} />
-              ))}
-            </div>
-
-            {/* Load More */}
-            <div className="text-center mt-8">
-              <Button variant="outline" size="lg">
-                Load More Results
-              </Button>
-            </div>
+            {filteredCars.length > 0 && (
+              <div className="text-center mt-8">
+                <Button variant="outline" size="lg">
+                  Load More Results
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      <Footer />
     </div>
   )
 }

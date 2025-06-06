@@ -1,30 +1,37 @@
 import { type NextRequest, NextResponse } from "next/server"
-
-const PAYSTACK_SECRET_KEY = "sk_test_1a23b7e132f0e15ae350d96c112b051426f7eead"
+import { initializePayment, generateReference } from "@/lib/paystack"
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, amount, reference, metadata } = await request.json()
+    const body = await request.json()
+    const { email, amount, metadata } = body
 
-    const response = await fetch("https://api.paystack.co/transaction/initialize", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-        "Content-Type": "application/json",
+    if (!email || !amount) {
+      return NextResponse.json({ error: "Email and amount are required" }, { status: 400 })
+    }
+
+    const reference = generateReference()
+
+    const paymentData = await initializePayment({
+      email,
+      amount,
+      reference,
+      callback_url: `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/payment/callback`,
+      metadata: {
+        ...metadata,
+        custom_fields: [
+          {
+            display_name: "Car Rental",
+            variable_name: "car_rental",
+            value: "QADA.ng Car Rental Service",
+          },
+        ],
       },
-      body: JSON.stringify({
-        email,
-        amount,
-        reference,
-        metadata,
-        callback_url: `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/payment/callback`,
-      }),
     })
 
-    const data = await response.json()
-    return NextResponse.json(data)
+    return NextResponse.json(paymentData)
   } catch (error) {
-    console.error("Paystack initialization error:", error)
-    return NextResponse.json({ status: false, message: "Payment initialization failed" }, { status: 500 })
+    console.error("Payment initialization error:", error)
+    return NextResponse.json({ error: "Failed to initialize payment" }, { status: 500 })
   }
 }
