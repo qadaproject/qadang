@@ -306,11 +306,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const table = profile.role === "customer" ? "users" : profile.role === "vendor" ? "vendors" : "admins"
+      console.log("Updating profile with data:", data)
 
-      const { error } = await supabase.from(table).update(data).eq("id", user.id)
+      // Update the users table for customers
+      const { error } = await supabase
+        .from("users")
+        .update({
+          first_name: data.first_name,
+          last_name: data.last_name,
+          phone: data.phone,
+          date_of_birth: data.date_of_birth,
+          address: data.address,
+          city: data.city,
+          state: data.state,
+          country: data.country,
+          emergency_contact_name: data.emergency_contact_name,
+          emergency_contact_phone: data.emergency_contact_phone,
+          bio: data.bio,
+          profile_image: data.profile_image,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id)
 
       if (error) {
+        console.error("Profile update error:", error)
         return { success: false, error: error.message }
       }
 
@@ -319,6 +338,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return { success: true }
     } catch (error: any) {
+      console.error("Profile update exception:", error)
       return { success: false, error: error.message }
     }
   }

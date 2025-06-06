@@ -1,286 +1,317 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import { Car, User, CreditCard, LogOut, Settings, Star, Gift, UserPlus } from "lucide-react"
+import { Edit, ArrowLeft, User, Phone, Mail, MapPin, Calendar, Users, FileText } from "lucide-react"
 import Link from "next/link"
+import { supabase } from "@/lib/supabase"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { LoadingAnimation } from "@/components/ui/loading-animation"
+
+interface UserData {
+  id: string
+  email: string
+  first_name?: string
+  last_name?: string
+  phone?: string
+  date_of_birth?: string
+  address?: string
+  city?: string
+  state?: string
+  country?: string
+  emergency_contact_name?: string
+  emergency_contact_phone?: string
+  bio?: string
+  profile_image?: string
+  wallet_balance?: number
+  reward_points?: number
+  referral_code?: string
+  created_at?: string
+  updated_at?: string
+}
 
 export default function ProfilePage() {
-  const { user, profile, signOut, updateProfile } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const router = useRouter()
+  const [userData, setUserData] = useState<UserData | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const [firstName, setFirstName] = useState(profile?.first_name || "")
-  const [lastName, setLastName] = useState(profile?.last_name || "")
-  const [phone, setPhone] = useState(profile?.phone || "")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/auth/login")
+      return
+    }
 
-  if (!user || !profile) {
-    router.push("/auth/login")
-    return null
-  }
+    if (user?.id) {
+      fetchUserData()
+    }
+  }, [user, authLoading, router])
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setSuccess(null)
-    setLoading(true)
+  const fetchUserData = async () => {
+    if (!user?.id) return
 
     try {
-      const { success, error } = await updateProfile({
-        first_name: firstName,
-        last_name: lastName,
-        phone,
-      })
+      const { data, error } = await supabase.from("users").select("*").eq("id", user.id).single()
 
-      if (success) {
-        setSuccess("Profile updated successfully")
-      } else {
-        setError(error || "Failed to update profile")
+      if (error) {
+        console.error("Error fetching user data:", error)
+        return
+      }
+
+      if (data) {
+        setUserData(data)
       }
     } catch (err) {
-      setError("An unexpected error occurred")
-      console.error(err)
+      console.error("Exception fetching user data:", err)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSignOut = async () => {
-    await signOut()
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <LoadingAnimation text="Loading profile..." />
+      </div>
+    )
+  }
+
+  if (!user || !userData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Profile not found.</p>
+          <Link href="/dashboard">
+            <Button className="mt-4">Go to Dashboard</Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const getDisplayName = () => {
+    if (userData.first_name && userData.last_name) {
+      return `${userData.first_name} ${userData.last_name}`
+    }
+    if (userData.first_name) {
+      return userData.first_name
+    }
+    return userData.email.split("@")[0]
+  }
+
+  const getUserInitials = () => {
+    if (userData.first_name && userData.last_name) {
+      return `${userData.first_name[0]}${userData.last_name[0]}`.toUpperCase()
+    }
+    if (userData.email) {
+      return userData.email[0].toUpperCase()
+    }
+    return "U"
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-blue-900 text-white">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between py-4">
-            <Link href="/" className="text-2xl font-bold flex items-center">
-              <Car className="h-6 w-6 mr-2" />
-              QADA.ng
-            </Link>
+      <div className="bg-white shadow-sm border-b">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" className="text-white hover:bg-blue-800" onClick={handleSignOut}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
+              <Link href="/dashboard">
+                <Button variant="ghost" size="icon">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-xl font-semibold">My Profile</h1>
+                <p className="text-sm text-gray-600">View and manage your profile information</p>
+              </div>
             </div>
+            <Link href="/profile/edit">
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Profile
+              </Button>
+            </Link>
           </div>
         </div>
-      </header>
+      </div>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Sidebar */}
-          <div className="w-full md:w-1/4">
-            <Card>
-              <CardContent className="p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Profile Summary Card */}
+            <Card className="lg:col-span-1">
+              <CardContent className="pt-6">
                 <div className="flex flex-col items-center text-center">
                   <Avatar className="h-24 w-24 mb-4">
-                    <AvatarImage src="/placeholder-user.jpg" alt={profile.first_name} />
-                    <AvatarFallback>
-                      {profile.first_name?.[0]}
-                      {profile.last_name?.[0]}
-                    </AvatarFallback>
+                    <AvatarImage src={userData.profile_image || "/placeholder.svg"} alt={getDisplayName()} />
+                    <AvatarFallback className="text-lg bg-blue-500 text-white">{getUserInitials()}</AvatarFallback>
                   </Avatar>
-                  <h2 className="text-xl font-bold">
-                    {profile.first_name} {profile.last_name}
-                  </h2>
-                  <p className="text-gray-500">{profile.email}</p>
-                  <Badge className="mt-2 bg-blue-100 text-blue-800">Customer</Badge>
-                </div>
+                  <h2 className="text-xl font-semibold">{getDisplayName()}</h2>
+                  <p className="text-gray-600 mb-4">{userData.email}</p>
 
-                <div className="mt-6 space-y-2">
-                  <Button variant="ghost" className="w-full justify-start" asChild>
-                    <Link href="/profile">
-                      <User className="h-4 w-4 mr-2" />
-                      My Profile
-                    </Link>
-                  </Button>
-                  <Button variant="ghost" className="w-full justify-start" asChild>
-                    <Link href="/wallet">
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      Wallet (₦{profile.wallet_balance?.toLocaleString() || 0})
-                    </Link>
-                  </Button>
-                  <Button variant="ghost" className="w-full justify-start" asChild>
-                    <Link href="/bookings">
-                      <Car className="h-4 w-4 mr-2" />
-                      My Bookings
-                    </Link>
-                  </Button>
-                  <Button variant="ghost" className="w-full justify-start" asChild>
-                    <Link href="/reviews">
-                      <Star className="h-4 w-4 mr-2" />
-                      My Reviews
-                    </Link>
-                  </Button>
-                  <Button variant="ghost" className="w-full justify-start" asChild>
-                    <Link href="/rewards">
-                      <Gift className="h-4 w-4 mr-2" />
-                      Rewards ({profile.reward_points || 0} points)
-                    </Link>
-                  </Button>
-                  <Button variant="ghost" className="w-full justify-start" asChild>
-                    <Link href="/referrals">
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Refer a Friend
-                    </Link>
-                  </Button>
-                  <Button variant="ghost" className="w-full justify-start" asChild>
-                    <Link href="/settings">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Account Settings
-                    </Link>
-                  </Button>
+                  <div className="w-full space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Wallet Balance</span>
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        ₦{(userData.wallet_balance || 0).toLocaleString()}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Reward Points</span>
+                      <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                        {userData.reward_points || 0}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Referral Code</span>
+                      <Badge variant="outline">{userData.referral_code}</Badge>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          </div>
 
-          {/* Main Content */}
-          <div className="w-full md:w-3/4">
-            <Tabs defaultValue="profile" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="profile">Profile Information</TabsTrigger>
-                <TabsTrigger value="security">Security Settings</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="profile" className="mt-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Personal Information</CardTitle>
-                    <CardDescription>Update your personal details</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {error && (
-                      <Alert variant="destructive" className="mb-4">
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
-
-                    {success && (
-                      <Alert className="mb-4">
-                        <AlertDescription>{success}</AlertDescription>
-                      </Alert>
-                    )}
-
-                    <form className="space-y-4" onSubmit={handleUpdateProfile}>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="firstName">First Name</Label>
-                          <Input
-                            id="firstName"
-                            value={firstName}
-                            onChange={(e) => setFirstName(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="lastName">Last Name</Label>
-                          <Input
-                            id="lastName"
-                            value={lastName}
-                            onChange={(e) => setLastName(e.target.value)}
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" value={profile.email} disabled />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Phone Number</Label>
-                        <Input
-                          id="phone"
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="referralCode">Your Referral Code</Label>
-                        <div className="flex">
-                          <Input
-                            id="referralCode"
-                            value={profile.referral_code || ""}
-                            readOnly
-                            className="rounded-r-none"
-                          />
-                          <Button
-                            type="button"
-                            className="rounded-l-none"
-                            onClick={() => {
-                              navigator.clipboard.writeText(profile.referral_code || "")
-                              setSuccess("Referral code copied to clipboard")
-                            }}
-                          >
-                            Copy
-                          </Button>
-                        </div>
-                      </div>
-
-                      <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={loading}>
-                        {loading ? "Updating..." : "Update Profile"}
-                      </Button>
-                    </form>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="security" className="mt-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Security Settings</CardTitle>
-                    <CardDescription>Manage your password and security preferences</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Change Password</Label>
-                      <Button className="w-full" variant="outline" asChild>
-                        <Link href="/auth/reset-password">Change Password</Link>
-                      </Button>
+            {/* Profile Details */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Personal Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <User className="h-5 w-5 mr-2" />
+                    Personal Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">First Name</label>
+                      <p className="text-gray-900">{userData.first_name || "Not provided"}</p>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label>Two-Factor Authentication</Label>
-                      <Button className="w-full" variant="outline">
-                        Enable Two-Factor Authentication
-                      </Button>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Last Name</label>
+                      <p className="text-gray-900">{userData.last_name || "Not provided"}</p>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label>Delete Account</Label>
-                      <Button className="w-full" variant="destructive">
-                        Delete My Account
-                      </Button>
-                      <p className="text-xs text-gray-500">
-                        This action is irreversible. All your data will be permanently deleted.
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Date of Birth</label>
+                      <p className="text-gray-900 flex items-center">
+                        <Calendar className="h-4 w-4 mr-2" />
+                        {userData.date_of_birth
+                          ? new Date(userData.date_of_birth).toLocaleDateString()
+                          : "Not provided"}
                       </p>
                     </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Phone Number</label>
+                      <p className="text-gray-900 flex items-center">
+                        <Phone className="h-4 w-4 mr-2" />
+                        {userData.phone || "Not provided"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {userData.bio && (
+                    <>
+                      <Separator />
+                      <div>
+                        <label className="text-sm font-medium text-gray-600 flex items-center mb-2">
+                          <FileText className="h-4 w-4 mr-2" />
+                          Bio
+                        </label>
+                        <p className="text-gray-900">{userData.bio}</p>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Address Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <MapPin className="h-5 w-5 mr-2" />
+                    Address Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Address</label>
+                      <p className="text-gray-900">{userData.address || "Not provided"}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">City</label>
+                      <p className="text-gray-900">{userData.city || "Not provided"}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">State</label>
+                      <p className="text-gray-900">{userData.state || "Not provided"}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Country</label>
+                      <p className="text-gray-900">{userData.country || "Nigeria"}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Emergency Contact */}
+              {(userData.emergency_contact_name || userData.emergency_contact_phone) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Users className="h-5 w-5 mr-2" />
+                      Emergency Contact
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Contact Name</label>
+                        <p className="text-gray-900">{userData.emergency_contact_name || "Not provided"}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Contact Phone</label>
+                        <p className="text-gray-900 flex items-center">
+                          <Phone className="h-4 w-4 mr-2" />
+                          {userData.emergency_contact_phone || "Not provided"}
+                        </p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
-              </TabsContent>
-            </Tabs>
+              )}
+
+              {/* Account Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Account Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Email Address</label>
+                      <p className="text-gray-900 flex items-center">
+                        <Mail className="h-4 w-4 mr-2" />
+                        {userData.email}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">Member Since</label>
+                      <p className="text-gray-900">
+                        {userData.created_at ? new Date(userData.created_at).toLocaleDateString() : "Unknown"}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </div>

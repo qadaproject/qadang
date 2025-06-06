@@ -125,9 +125,9 @@ export default function UserDashboard() {
                   )}
                 </div>
               </div>
-              <Link href="/profile/edit">
+              <Link href="/profile">
                 <Button variant="outline" className="w-full">
-                  Edit Profile
+                  View Profile
                 </Button>
               </Link>
             </CardContent>
