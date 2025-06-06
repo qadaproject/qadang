@@ -1,8 +1,12 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { Eye, EyeOff, Car } from "lucide-react"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,25 +15,62 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState("customer")
+
+  const { signIn } = useAuth()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirect = searchParams.get("redirect") || "/"
+
+  const handleLogin = async (e: React.FormEvent, userType: string) => {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+
+    try {
+      const { success, error } = await signIn(email, password)
+
+      if (success) {
+        // Redirect based on user type
+        if (userType === "vendor") {
+          router.push("/vendor-dashboard")
+        } else if (userType === "admin") {
+          router.push("/admin")
+        } else {
+          router.push(redirect)
+        }
+      } else {
+        setError(error || "Login failed. Please check your credentials.")
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.")
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-800 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center space-x-2">
-            <Car className="h-8 w-8 text-blue-600" />
-            <span className="text-3xl font-bold text-blue-600">QADA.ng</span>
+            <Car className="h-8 w-8 text-white" />
+            <span className="text-3xl font-bold text-white">QADA.ng</span>
           </Link>
-          <p className="text-gray-600 mt-2">Welcome back to Nigeria's car rental marketplace</p>
+          <p className="text-blue-100 mt-2">Welcome back to Nigeria's car rental marketplace</p>
         </div>
 
-        <Card>
+        <Card className="border-0 shadow-lg">
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">Sign in to your account</CardTitle>
             <CardDescription className="text-center">
@@ -37,14 +78,20 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="customer" className="w-full">
+            <Tabs defaultValue="customer" value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="customer">Customer</TabsTrigger>
                 <TabsTrigger value="vendor">Vendor</TabsTrigger>
               </TabsList>
 
               <TabsContent value="customer" className="space-y-4 mt-6">
-                <form className="space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <form className="space-y-4" onSubmit={(e) => handleLogin(e, "customer")}>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
@@ -92,8 +139,8 @@ export default function LoginPage() {
                     </Link>
                   </div>
 
-                  <Button type="submit" className="w-full">
-                    Sign In
+                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                    {loading ? "Signing in..." : "Sign In"}
                   </Button>
                 </form>
 
@@ -145,10 +192,23 @@ export default function LoginPage() {
               </TabsContent>
 
               <TabsContent value="vendor" className="space-y-4 mt-6">
-                <form className="space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <form className="space-y-4" onSubmit={(e) => handleLogin(e, "vendor")}>
                   <div className="space-y-2">
-                    <Label htmlFor="vendor-email">Email</Label>
-                    <Input id="vendor-email" type="email" placeholder="Enter your business email" required />
+                    <Label htmlFor="vendor-email">Business Email</Label>
+                    <Input
+                      id="vendor-email"
+                      type="email"
+                      placeholder="Enter your business email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -158,6 +218,8 @@ export default function LoginPage() {
                         id="vendor-password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Enter your password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         required
                       />
                       <Button
@@ -184,8 +246,8 @@ export default function LoginPage() {
                     </Link>
                   </div>
 
-                  <Button type="submit" className="w-full">
-                    Vendor Sign In
+                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                    {loading ? "Signing in..." : "Vendor Sign In"}
                   </Button>
                 </form>
 

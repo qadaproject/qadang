@@ -1,8 +1,12 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { Eye, EyeOff, Car } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -19,20 +24,79 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [referralCode, setReferralCode] = useState("")
+  const [acceptTerms, setAcceptTerms] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const { signUp } = useAuth()
+  const router = useRouter()
+
+  const validateForm = () => {
+    if (password !== confirmPassword) {
+      setError("Passwords do not match")
+      return false
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long")
+      return false
+    }
+
+    if (!acceptTerms) {
+      setError("You must accept the terms and conditions")
+      return false
+    }
+
+    return true
+  }
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!validateForm()) {
+      return
+    }
+
+    setError(null)
+    setLoading(true)
+
+    try {
+      const { success, error } = await signUp(email, password, {
+        first_name: firstName,
+        last_name: lastName,
+        phone,
+        role: "customer",
+        referral_code: referralCode,
+      })
+
+      if (success) {
+        router.push("/auth/verification?email=" + encodeURIComponent(email))
+      } else {
+        setError(error || "Registration failed. Please try again.")
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.")
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-800 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center space-x-2">
-            <Car className="h-8 w-8 text-blue-600" />
-            <span className="text-3xl font-bold text-blue-600">QADA.ng</span>
+            <Car className="h-8 w-8 text-white" />
+            <span className="text-3xl font-bold text-white">QADA.ng</span>
           </Link>
-          <p className="text-gray-600 mt-2">Create an account to start renting cars in Nigeria</p>
+          <p className="text-blue-100 mt-2">Create an account to start renting cars in Nigeria</p>
         </div>
 
-        <Card>
+        <Card className="border-0 shadow-lg">
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">Create an account</CardTitle>
             <CardDescription className="text-center">Enter your details to create your account</CardDescription>
@@ -45,7 +109,13 @@ export default function RegisterPage() {
               </TabsList>
 
               <TabsContent value="customer" className="space-y-4 mt-6">
-                <form className="space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <form className="space-y-4" onSubmit={handleRegister}>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">First Name</Label>
@@ -114,13 +184,40 @@ export default function RegisterPage() {
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <Input
+                      id="confirmPassword"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Confirm your password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                    />
                     <p className="text-xs text-gray-500">
                       Password must be at least 8 characters long with a number and a special character
                     </p>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="referralCode">Referral Code (Optional)</Label>
+                    <Input
+                      id="referralCode"
+                      placeholder="Enter referral code if you have one"
+                      value={referralCode}
+                      onChange={(e) => setReferralCode(e.target.value)}
+                    />
+                  </div>
+
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="terms" required />
+                    <Checkbox
+                      id="terms"
+                      checked={acceptTerms}
+                      onCheckedChange={(checked) => setAcceptTerms(checked === true)}
+                      required
+                    />
                     <Label htmlFor="terms" className="text-sm">
                       I agree to the{" "}
                       <Link href="/terms" className="text-blue-600 hover:underline">
@@ -133,8 +230,8 @@ export default function RegisterPage() {
                     </Label>
                   </div>
 
-                  <Button type="submit" className="w-full">
-                    Create Account
+                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                    {loading ? "Creating Account..." : "Create Account"}
                   </Button>
                 </form>
 
@@ -192,7 +289,7 @@ export default function RegisterPage() {
                     To register as a vendor, please visit our vendor registration page for a more detailed application
                     process.
                   </p>
-                  <Button className="mt-3 w-full" asChild>
+                  <Button className="mt-3 w-full bg-blue-600 hover:bg-blue-700" asChild>
                     <Link href="/auth/vendor-register">Register as a Vendor</Link>
                   </Button>
                 </div>
