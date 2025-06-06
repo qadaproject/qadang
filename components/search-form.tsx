@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { format, addDays } from "date-fns"
 import { Calendar, Clock, MapPin } from "lucide-react"
@@ -66,6 +66,13 @@ const timeOptions = [
   "23:30",
 ]
 
+declare global {
+  interface Window {
+    google: any
+    initMap: () => void
+  }
+}
+
 export function SearchForm() {
   const router = useRouter()
   const [location, setLocation] = useState("")
@@ -76,6 +83,60 @@ export function SearchForm() {
   const [differentDropoff, setDifferentDropoff] = useState(false)
   const [dropoffLocation, setDropoffLocation] = useState("")
   const [driverAge, setDriverAge] = useState(true)
+  const [predictions, setPredictions] = useState<any[]>([])
+  const [showPredictions, setShowPredictions] = useState(false)
+
+  const autocompleteService = useRef<any>(null)
+  const placesService = useRef<any>(null)
+
+  useEffect(() => {
+    // Load Google Maps API
+    if (!window.google) {
+      const script = document.createElement("script")
+      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyBOti4mM-6x9WDnZIjIeyEU21OpBXqWBgw&libraries=places&callback=initMap`
+      script.async = true
+      script.defer = true
+
+      window.initMap = () => {
+        autocompleteService.current = new window.google.maps.places.AutocompleteService()
+        placesService.current = new window.google.maps.places.PlacesService(document.createElement("div"))
+      }
+
+      document.head.appendChild(script)
+    } else {
+      autocompleteService.current = new window.google.maps.places.AutocompleteService()
+      placesService.current = new window.google.maps.places.PlacesService(document.createElement("div"))
+    }
+  }, [])
+
+  const handleLocationChange = (value: string) => {
+    setLocation(value)
+
+    if (value.length > 2 && autocompleteService.current) {
+      autocompleteService.current.getPlacePredictions(
+        {
+          input: value,
+          componentRestrictions: { country: "ng" }, // Restrict to Nigeria
+          types: ["(cities)"],
+        },
+        (predictions: any[], status: any) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+            setPredictions(predictions)
+            setShowPredictions(true)
+          }
+        },
+      )
+    } else {
+      setPredictions([])
+      setShowPredictions(false)
+    }
+  }
+
+  const selectLocation = (prediction: any) => {
+    setLocation(prediction.description)
+    setShowPredictions(false)
+    setPredictions([])
+  }
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -100,17 +161,36 @@ export function SearchForm() {
     <form onSubmit={handleSearch} className="bg-white p-4 rounded-md shadow-md">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Pickup Location */}
-        <div className="md:col-span-2">
+        <div className="md:col-span-2 relative">
           <div className="relative">
             <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <Input
               placeholder="Pick-up location"
-              className="pl-10 h-12 border-2 border-yellow-400 focus:border-yellow-500 focus:ring-yellow-500"
+              className="pl-10 h-12 border-2 border-yellow-400 focus:border-yellow-500 focus:ring-yellow-500 text-black placeholder:text-gray-500"
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              onChange={(e) => handleLocationChange(e.target.value)}
+              onFocus={() => setShowPredictions(predictions.length > 0)}
               required
             />
           </div>
+
+          {/* Google Places Predictions */}
+          {showPredictions && predictions.length > 0 && (
+            <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
+              {predictions.map((prediction, index) => (
+                <div
+                  key={prediction.place_id}
+                  className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                  onClick={() => selectLocation(prediction)}
+                >
+                  <div className="flex items-center">
+                    <MapPin className="h-4 w-4 text-gray-400 mr-2" />
+                    <span className="text-sm text-black">{prediction.description}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Pickup Date */}
@@ -122,7 +202,7 @@ export function SearchForm() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal h-12 border-2 border-yellow-400 hover:border-yellow-500",
+                      "w-full justify-start text-left font-normal h-12 border-2 border-yellow-400 hover:border-yellow-500 text-black",
                       !pickupDate && "text-muted-foreground",
                     )}
                   >
@@ -130,7 +210,7 @@ export function SearchForm() {
                     {pickupDate ? (
                       <div className="flex flex-col items-start">
                         <span className="text-xs text-gray-500">Pick-up date</span>
-                        <span>{format(pickupDate, "E, d MMM")}</span>
+                        <span className="text-black">{format(pickupDate, "E, d MMM")}</span>
                       </div>
                     ) : (
                       <span>Pick a date</span>
@@ -149,7 +229,7 @@ export function SearchForm() {
             </div>
             <div>
               <Select value={pickupTime} onValueChange={setPickupTime}>
-                <SelectTrigger className="h-12 border-2 border-yellow-400 hover:border-yellow-500">
+                <SelectTrigger className="h-12 border-2 border-yellow-400 hover:border-yellow-500 text-black">
                   <div className="flex items-center">
                     <Clock className="mr-2 h-4 w-4 text-gray-400" />
                     <div className="flex flex-col items-start">
@@ -179,7 +259,7 @@ export function SearchForm() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal h-12 border-2 border-yellow-400 hover:border-yellow-500",
+                      "w-full justify-start text-left font-normal h-12 border-2 border-yellow-400 hover:border-yellow-500 text-black",
                       !returnDate && "text-muted-foreground",
                     )}
                   >
@@ -187,7 +267,7 @@ export function SearchForm() {
                     {returnDate ? (
                       <div className="flex flex-col items-start">
                         <span className="text-xs text-gray-500">Drop-off date</span>
-                        <span>{format(returnDate, "E, d MMM")}</span>
+                        <span className="text-black">{format(returnDate, "E, d MMM")}</span>
                       </div>
                     ) : (
                       <span>Pick a date</span>
@@ -207,7 +287,7 @@ export function SearchForm() {
             </div>
             <div>
               <Select value={returnTime} onValueChange={setReturnTime}>
-                <SelectTrigger className="h-12 border-2 border-yellow-400 hover:border-yellow-500">
+                <SelectTrigger className="h-12 border-2 border-yellow-400 hover:border-yellow-500 text-black">
                   <div className="flex items-center">
                     <Clock className="mr-2 h-4 w-4 text-gray-400" />
                     <div className="flex flex-col items-start">
@@ -243,7 +323,7 @@ export function SearchForm() {
               checked={differentDropoff}
               onCheckedChange={(checked) => setDifferentDropoff(checked as boolean)}
             />
-            <Label htmlFor="different-location" className="text-sm">
+            <Label htmlFor="different-location" className="text-sm text-black">
               Drop car off at different location
             </Label>
           </div>
@@ -254,7 +334,7 @@ export function SearchForm() {
               checked={driverAge}
               onCheckedChange={(checked) => setDriverAge(checked as boolean)}
             />
-            <Label htmlFor="driver-age" className="text-sm">
+            <Label htmlFor="driver-age" className="text-sm text-black">
               Driver aged 30 – 65?
             </Label>
           </div>
@@ -267,7 +347,7 @@ export function SearchForm() {
               <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <Input
                 placeholder="Drop-off location"
-                className="pl-10 h-12 border-2 border-yellow-400 focus:border-yellow-500 focus:ring-yellow-500"
+                className="pl-10 h-12 border-2 border-yellow-400 focus:border-yellow-500 focus:ring-yellow-500 text-black placeholder:text-gray-500"
                 value={dropoffLocation}
                 onChange={(e) => setDropoffLocation(e.target.value)}
                 required={differentDropoff}

@@ -455,9 +455,11 @@ export default function SearchPage() {
           <Link href={`/cars/${car.id}`} className="flex-1">
             <Button className="w-full bg-[#0071c2] hover:bg-[#005999]">View Details</Button>
           </Link>
-          <Button variant="outline" className="flex-1">
-            Book Now
-          </Button>
+          <Link href={`/cars/${car.id}`} className="flex-1">
+            <Button variant="outline" className="w-full">
+              Book Now
+            </Button>
+          </Link>
         </div>
       </CardContent>
     </Card>
