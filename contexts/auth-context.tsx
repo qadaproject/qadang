@@ -4,7 +4,7 @@ import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { supabase, sendVerificationEmail, sendPasswordResetEmail } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 type UserRole = "customer" | "vendor" | "admin"
@@ -22,6 +22,7 @@ interface UserProfile {
   business_name?: string // For vendors
   email_verified: boolean
   email_verified_at?: string
+  profile_image?: string
 }
 
 interface AuthContextType {
@@ -37,7 +38,7 @@ interface AuthContextType {
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>
   updateProfile: (data: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>
-  resendVerification: (email: string, userType: UserRole) => Promise<{ success: boolean; error?: string }>
+  resendVerification: (email: string) => Promise<{ success: boolean; error?: string }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -181,7 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/verify-email?type=${userData.role || "customer"}&email=${encodeURIComponent(email)}`,
+          emailRedirectTo: `${window.location.origin}/auth/verify-email`,
         },
       })
 
@@ -252,12 +253,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Reset password function
   const resetPassword = async (email: string) => {
-    return await sendPasswordResetEmail(email)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      })
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      return { success: true }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
   }
 
   // Resend verification function
-  const resendVerification = async (email: string, userType: UserRole) => {
-    return await sendVerificationEmail(email, userType)
+  const resendVerification = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/verify-email`,
+        },
+      })
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      return { success: true }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
   }
 
   // Update profile function
