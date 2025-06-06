@@ -5,9 +5,8 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Upload, Save, X } from "lucide-react"
+import { ArrowLeft, Upload } from "lucide-react"
 import Link from "next/link"
-import { supabase } from "@/lib/supabase"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,34 +18,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { LoadingAnimation } from "@/components/ui/loading-animation"
 
-interface UserData {
-  id: string
-  email: string
-  first_name?: string
-  last_name?: string
-  phone?: string
-  date_of_birth?: string
-  address?: string
-  city?: string
-  state?: string
-  country?: string
-  emergency_contact_name?: string
-  emergency_contact_phone?: string
-  bio?: string
-  profile_image?: string
-  wallet_balance?: number
-  reward_points?: number
-  referral_code?: string
-  created_at?: string
-  updated_at?: string
-}
-
 export default function EditProfilePage() {
-  const { user, profile, loading: authLoading } = useAuth()
+  const { user, profile, updateProfile, loading } = useAuth()
   const router = useRouter()
 
-  const [userData, setUserData] = useState<UserData | null>(null)
-  const [loading, setLoading] = useState(true)
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -67,57 +42,28 @@ export default function EditProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  // Fetch user data from database
-  const fetchUserData = async () => {
-    if (!user?.id) return
-
-    try {
-      console.log("Fetching user data for ID:", user.id)
-
-      const { data, error } = await supabase.from("users").select("*").eq("id", user.id).single()
-
-      if (error) {
-        console.error("Error fetching user data:", error)
-        setError("Failed to load profile data")
-        return
-      }
-
-      if (data) {
-        console.log("User data fetched:", data)
-        setUserData(data)
-        setFormData({
-          first_name: data.first_name || "",
-          last_name: data.last_name || "",
-          phone: data.phone || "",
-          date_of_birth: data.date_of_birth || "",
-          address: data.address || "",
-          city: data.city || "",
-          state: data.state || "",
-          country: data.country || "Nigeria",
-          emergency_contact_name: data.emergency_contact_name || "",
-          emergency_contact_phone: data.emergency_contact_phone || "",
-          bio: data.bio || "",
-        })
-        setPreviewUrl(data.profile_image || "")
-      }
-    } catch (err) {
-      console.error("Exception fetching user data:", err)
-      setError("Failed to load profile data")
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!loading && !user) {
       router.push("/auth/login")
-      return
     }
 
-    if (user?.id) {
-      fetchUserData()
+    if (profile) {
+      setFormData({
+        first_name: profile.first_name || "",
+        last_name: profile.last_name || "",
+        phone: profile.phone || "",
+        date_of_birth: profile.date_of_birth || "",
+        address: profile.address || "",
+        city: profile.city || "",
+        state: profile.state || "",
+        country: profile.country || "Nigeria",
+        emergency_contact_name: profile.emergency_contact_name || "",
+        emergency_contact_phone: profile.emergency_contact_phone || "",
+        bio: profile.bio || "",
+      })
+      setPreviewUrl(profile.profile_image || "")
     }
-  }, [user, authLoading, router])
+  }, [user, profile, loading, router])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
@@ -142,60 +88,37 @@ export default function EditProfilePage() {
     setUpdating(true)
 
     try {
-      console.log("Updating profile with data:", formData)
-
       // TODO: Upload profile image to storage if changed
       let imageUrl = previewUrl
+
       if (profileImage) {
+        // Upload to Supabase storage or your preferred storage service
         // For now, we'll use the preview URL
-        // In production, upload to Supabase storage
         imageUrl = previewUrl
       }
 
-      // Update user data in database
-      const { error: updateError } = await supabase
-        .from("users")
-        .update({
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          phone: formData.phone,
-          date_of_birth: formData.date_of_birth,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          country: formData.country,
-          emergency_contact_name: formData.emergency_contact_name,
-          emergency_contact_phone: formData.emergency_contact_phone,
-          bio: formData.bio,
-          profile_image: imageUrl,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", user?.id)
+      const { success, error } = await updateProfile({
+        ...formData,
+        profile_image: imageUrl,
+      })
 
-      if (updateError) {
-        console.error("Update error:", updateError)
-        setError(updateError.message)
-        return
+      if (success) {
+        setSuccess("Profile updated successfully!")
+        setTimeout(() => {
+          router.push("/profile")
+        }, 2000)
+      } else {
+        setError(error || "Failed to update profile")
       }
-
-      setSuccess("Profile updated successfully!")
-
-      // Refresh user data
-      await fetchUserData()
-
-      // Redirect after success
-      setTimeout(() => {
-        router.push("/dashboard")
-      }, 2000)
-    } catch (err: any) {
-      console.error("Update exception:", err)
+    } catch (err) {
       setError("An unexpected error occurred")
+      console.error(err)
     } finally {
       setUpdating(false)
     }
   }
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <LoadingAnimation text="Loading profile..." />
@@ -203,17 +126,8 @@ export default function EditProfilePage() {
     )
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600">Please log in to edit your profile.</p>
-          <Link href="/auth/login">
-            <Button className="mt-4">Go to Login</Button>
-          </Link>
-        </div>
-      </div>
-    )
+  if (!user || !profile) {
+    return null
   }
 
   const nigerianStates = [
@@ -262,7 +176,7 @@ export default function EditProfilePage() {
       <div className="bg-white shadow-sm border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center space-x-4">
-            <Link href="/dashboard">
+            <Link href="/profile">
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
@@ -285,14 +199,13 @@ export default function EditProfilePage() {
             <CardContent>
               {error && (
                 <Alert variant="destructive" className="mb-6">
-                  <X className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
 
               {success && (
-                <Alert className="mb-6 border-green-200 bg-green-50">
-                  <AlertDescription className="text-green-800">{success}</AlertDescription>
+                <Alert className="mb-6">
+                  <AlertDescription>{success}</AlertDescription>
                 </Alert>
               )}
 
@@ -301,9 +214,9 @@ export default function EditProfilePage() {
                 <div className="flex flex-col items-center space-y-4">
                   <Avatar className="h-24 w-24">
                     <AvatarImage src={previewUrl || "/placeholder.svg"} alt="Profile" />
-                    <AvatarFallback className="text-lg bg-blue-500 text-white">
-                      {formData.first_name?.[0] || "U"}
-                      {formData.last_name?.[0] || ""}
+                    <AvatarFallback className="text-lg">
+                      {formData.first_name?.[0]}
+                      {formData.last_name?.[0]}
                     </AvatarFallback>
                   </Avatar>
                   <div>
@@ -328,23 +241,21 @@ export default function EditProfilePage() {
                 {/* Basic Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="first_name">First Name *</Label>
+                    <Label htmlFor="first_name">First Name</Label>
                     <Input
                       id="first_name"
                       value={formData.first_name}
                       onChange={(e) => handleInputChange("first_name", e.target.value)}
                       required
-                      className="border-yellow-300 focus:border-yellow-500"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="last_name">Last Name *</Label>
+                    <Label htmlFor="last_name">Last Name</Label>
                     <Input
                       id="last_name"
                       value={formData.last_name}
                       onChange={(e) => handleInputChange("last_name", e.target.value)}
                       required
-                      className="border-yellow-300 focus:border-yellow-500"
                     />
                   </div>
                 </div>
@@ -352,15 +263,13 @@ export default function EditProfilePage() {
                 {/* Contact Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number *</Label>
+                    <Label htmlFor="phone">Phone Number</Label>
                     <Input
                       id="phone"
                       type="tel"
                       value={formData.phone}
                       onChange={(e) => handleInputChange("phone", e.target.value)}
                       required
-                      className="border-yellow-300 focus:border-yellow-500"
-                      placeholder="+234 xxx xxx xxxx"
                     />
                   </div>
                   <div className="space-y-2">
@@ -370,7 +279,6 @@ export default function EditProfilePage() {
                       type="date"
                       value={formData.date_of_birth}
                       onChange={(e) => handleInputChange("date_of_birth", e.target.value)}
-                      className="border-yellow-300 focus:border-yellow-500"
                     />
                   </div>
                 </div>
@@ -384,7 +292,6 @@ export default function EditProfilePage() {
                       value={formData.address}
                       onChange={(e) => handleInputChange("address", e.target.value)}
                       placeholder="Street address"
-                      className="border-yellow-300 focus:border-yellow-500"
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -394,13 +301,12 @@ export default function EditProfilePage() {
                         id="city"
                         value={formData.city}
                         onChange={(e) => handleInputChange("city", e.target.value)}
-                        className="border-yellow-300 focus:border-yellow-500"
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="state">State</Label>
                       <Select value={formData.state} onValueChange={(value) => handleInputChange("state", value)}>
-                        <SelectTrigger className="border-yellow-300 focus:border-yellow-500">
+                        <SelectTrigger>
                           <SelectValue placeholder="Select state" />
                         </SelectTrigger>
                         <SelectContent>
@@ -419,7 +325,6 @@ export default function EditProfilePage() {
                         value={formData.country}
                         onChange={(e) => handleInputChange("country", e.target.value)}
                         disabled
-                        className="bg-gray-100"
                       />
                     </div>
                   </div>
@@ -433,7 +338,6 @@ export default function EditProfilePage() {
                       id="emergency_contact_name"
                       value={formData.emergency_contact_name}
                       onChange={(e) => handleInputChange("emergency_contact_name", e.target.value)}
-                      className="border-yellow-300 focus:border-yellow-500"
                     />
                   </div>
                   <div className="space-y-2">
@@ -443,8 +347,6 @@ export default function EditProfilePage() {
                       type="tel"
                       value={formData.emergency_contact_phone}
                       onChange={(e) => handleInputChange("emergency_contact_phone", e.target.value)}
-                      className="border-yellow-300 focus:border-yellow-500"
-                      placeholder="+234 xxx xxx xxxx"
                     />
                   </div>
                 </div>
@@ -458,42 +360,15 @@ export default function EditProfilePage() {
                     onChange={(e) => handleInputChange("bio", e.target.value)}
                     placeholder="Tell us a bit about yourself..."
                     rows={4}
-                    className="border-yellow-300 focus:border-yellow-500"
                   />
                 </div>
-
-                {/* Account Information (Read-only) */}
-                {userData && (
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-medium mb-3">Account Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-gray-600">Email:</span>
-                        <p className="font-medium">{userData.email}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Referral Code:</span>
-                        <p className="font-medium">{userData.referral_code}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Wallet Balance:</span>
-                        <p className="font-medium">₦{(userData.wallet_balance || 0).toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Reward Points:</span>
-                        <p className="font-medium">{userData.reward_points || 0}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Submit Button */}
                 <div className="flex space-x-4">
                   <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={updating}>
-                    <Save className="h-4 w-4 mr-2" />
                     {updating ? "Updating..." : "Update Profile"}
                   </Button>
-                  <Link href="/dashboard">
+                  <Link href="/profile">
                     <Button type="button" variant="outline">
                       Cancel
                     </Button>
