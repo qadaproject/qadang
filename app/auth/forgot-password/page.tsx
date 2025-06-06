@@ -65,11 +65,14 @@ export default function ForgotPasswordPage() {
           <CardContent>
             {isSubmitted ? (
               <div className="space-y-4 text-center">
+                <Alert>
+                  <AlertDescription>
+                    We've sent a password reset link to <span className="font-medium">{email}</span>
+                  </AlertDescription>
+                </Alert>
                 <p className="text-sm text-gray-600">
-                  We've sent a password reset link to <span className="font-medium">{email}</span>
-                </p>
-                <p className="text-sm text-gray-600">
-                  Please check your email and follow the instructions to reset your password.
+                  Please check your email and follow the instructions to reset your password. The link will expire in 1
+                  hour.
                 </p>
                 <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700" asChild>
                   <Link href="/auth/login">Return to login</Link>

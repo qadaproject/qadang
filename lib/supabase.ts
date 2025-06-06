@@ -4,7 +4,31 @@ const supabaseUrl = "https://fkeqqlloklmxenrikcdl.supabase.co"
 const supabaseAnonKey =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrZXFxbGxva2xteGVucmlrY2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkxOTg0MDgsImV4cCI6MjA2NDc3NDQwOH0.RLU_Et3ZS5Vj4faoWwzuIfgT7ry2TdXUKw9VS3HksiQ"
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Get the base URL for redirects
+const getBaseUrl = () => {
+  if (typeof window !== "undefined") {
+    // Browser environment
+    return window.location.origin
+  }
+
+  // Server environment
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL
+  }
+
+  // Fallback for development
+  return "http://localhost:3000"
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    redirectTo: `${getBaseUrl()}/auth/callback`,
+  },
+})
 
 // Helper function to handle Supabase errors
 export const handleSupabaseError = (error: any) => {
@@ -28,32 +52,102 @@ export const getAuthenticatedUser = async () => {
   return user
 }
 
-// Database types
+// Email verification functions
+export const sendVerificationEmail = async (email: string, userType: "customer" | "vendor" | "admin") => {
+  try {
+    const baseUrl = getBaseUrl()
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${baseUrl}/auth/verify-email?type=${userType}`,
+      },
+    })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+// Password reset with proper redirect
+export const sendPasswordResetEmail = async (email: string) => {
+  try {
+    const baseUrl = getBaseUrl()
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${baseUrl}/auth/reset-password`,
+    })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+// Database types (updated with new fields)
 export interface User {
   id: string
   email: string
-  first_name: string
-  last_name: string
-  phone: string
+  first_name?: string
+  last_name?: string
+  phone?: string
   wallet_balance: number
   reward_points: number
   referral_code: string
   referred_by?: string
+  email_verified: boolean
+  email_verified_at?: string
+  verification_token?: string
+  verification_token_expires?: string
   created_at: string
+  updated_at: string
 }
 
 export interface Vendor {
   id: string
   business_name: string
   email: string
-  phone: string
-  address: string
-  city: string
-  state: string
+  phone?: string
+  address?: string
+  city?: string
+  state?: string
   status: "pending" | "approved" | "rejected" | "suspended"
   rating: number
   total_bookings: number
+  email_verified: boolean
+  email_verified_at?: string
+  verification_token?: string
+  verification_token_expires?: string
   created_at: string
+  updated_at: string
+}
+
+export interface Admin {
+  id: string
+  email: string
+  first_name?: string
+  last_name?: string
+  role: string
+  password_hash?: string
+  password_reset_token?: string
+  password_reset_expires?: string
+  two_factor_enabled: boolean
+  two_factor_secret?: string
+  backup_codes?: string[]
+  last_login?: string
+  login_attempts: number
+  locked_until?: string
+  email_verified: boolean
+  email_verified_at?: string
+  created_at: string
+  updated_at: string
 }
 
 export interface Car {
@@ -166,5 +260,36 @@ export interface RewardTransaction {
   points: number
   description: string
   booking_id?: string
+  created_at: string
+}
+
+export interface EmailVerificationToken {
+  id: string
+  user_id: string
+  user_type: "customer" | "vendor" | "admin"
+  token: string
+  expires_at: string
+  used_at?: string
+  created_at: string
+}
+
+export interface PasswordResetToken {
+  id: string
+  user_id: string
+  user_type: "customer" | "vendor" | "admin"
+  token: string
+  expires_at: string
+  used_at?: string
+  created_at: string
+}
+
+export interface TwoFactorAuth {
+  id: string
+  user_id: string
+  user_type: "customer" | "vendor" | "admin"
+  secret: string
+  backup_codes: string[]
+  enabled_at?: string
+  last_used?: string
   created_at: string
 }

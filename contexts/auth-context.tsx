@@ -4,7 +4,7 @@ import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { supabase, sendVerificationEmail, sendPasswordResetEmail } from "@/lib/supabase"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 type UserRole = "customer" | "vendor" | "admin"
@@ -20,6 +20,8 @@ interface UserProfile {
   reward_points?: number
   referral_code?: string
   business_name?: string // For vendors
+  email_verified: boolean
+  email_verified_at?: string
 }
 
 interface AuthContextType {
@@ -35,6 +37,7 @@ interface AuthContextType {
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>
   updateProfile: (data: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>
+  resendVerification: (email: string, userType: UserRole) => Promise<{ success: boolean; error?: string }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -138,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: userData.user.id,
             email: userData.user.email || "",
             role: "customer", // Default role
+            email_verified: false,
           })
         }
       }
@@ -176,6 +180,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/verify-email?type=${userData.role || "customer"}&email=${encodeURIComponent(email)}`,
+        },
       })
 
       if (authError) {
@@ -202,6 +209,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           reward_points: 0,
           referral_code: generateReferralCode(),
           referred_by: userData.referral_code,
+          email_verified: false,
         })
 
         if (profileError) {
@@ -220,15 +228,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           status: "pending",
           rating: 0,
           total_bookings: 0,
+          email_verified: false,
         })
 
         if (profileError) {
           return { success: false, error: profileError.message }
         }
       }
-
-      // Fetch the newly created profile
-      await fetchUserProfile(userId)
 
       return { success: true }
     } catch (error: any) {
@@ -246,19 +252,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Reset password function
   const resetPassword = async (email: string) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
-      })
+    return await sendPasswordResetEmail(email)
+  }
 
-      if (error) {
-        return { success: false, error: error.message }
-      }
-
-      return { success: true }
-    } catch (error: any) {
-      return { success: false, error: error.message }
-    }
+  // Resend verification function
+  const resendVerification = async (email: string, userType: UserRole) => {
+    return await sendVerificationEmail(email, userType)
   }
 
   // Update profile function
@@ -299,6 +298,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
     resetPassword,
     updateProfile,
+    resendVerification,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
