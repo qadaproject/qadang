@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { User, CreditCard, Package, Wallet, Gift, Car, Phone, Mail, LogOut } from "lucide-react"
 import Link from "next/link"
+import { LoadingAnimation } from "@/components/ui/loading-animation"
 
 export default function UserDashboard() {
   const { user, profile, loading, signOut } = useAuth()
@@ -29,10 +30,7 @@ export default function UserDashboard() {
   if (!mounted || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Car className="h-12 w-12 mx-auto mb-4 animate-spin text-blue-600" />
-          <p className="text-gray-600">Loading your dashboard...</p>
-        </div>
+        <LoadingAnimation text="Loading your dashboard..." />
       </div>
     )
   }
@@ -127,7 +125,7 @@ export default function UserDashboard() {
                   )}
                 </div>
               </div>
-              <Link href="/profile">
+              <Link href="/profile/edit">
                 <Button variant="outline" className="w-full">
                   Edit Profile
                 </Button>

@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Upload, User } from "lucide-react"
+import { ArrowLeft, Upload } from "lucide-react"
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { LoadingAnimation } from "@/components/ui/loading-animation"
 
 export default function EditProfilePage() {
   const { user, profile, updateProfile, loading } = useAuth()
@@ -120,10 +121,7 @@ export default function EditProfilePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <User className="h-12 w-12 mx-auto mb-4 animate-spin text-blue-600" />
-          <p className="text-gray-600">Loading profile...</p>
-        </div>
+        <LoadingAnimation text="Loading profile..." />
       </div>
     )
   }

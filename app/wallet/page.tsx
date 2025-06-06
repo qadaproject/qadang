@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { supabase } from "@/lib/supabase"
+import { LoadingAnimation } from "@/components/ui/loading-animation"
 
 interface WalletTransaction {
   id: string
@@ -141,10 +142,7 @@ export default function WalletPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Wallet className="h-12 w-12 mx-auto mb-4 animate-spin text-blue-600" />
-          <p className="text-gray-600">Loading wallet...</p>
-        </div>
+        <LoadingAnimation text="Loading wallet..." />
       </div>
     )
   }
